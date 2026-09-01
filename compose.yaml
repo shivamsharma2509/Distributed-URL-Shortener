@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shortstack
+      POSTGRES_USER: shortstack
+      POSTGRES_PASSWORD: shortstack
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortstack -d shortstack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgresql://shortstack:shortstack@postgres:5432/shortstack
+      REDIS_URL: redis://redis:6379
+      SHORT_URL_BASE_URL: http://localhost:5000
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/url-shortener/Dockerfile
+    environment:
+      PORT: 5173
+      BASE_PATH: /
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
