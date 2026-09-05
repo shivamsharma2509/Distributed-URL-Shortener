@@ -1,0 +1,2 @@
+- [Runtime boundary](runtime-boundary.md) — React remains pnpm/Vite; the deployable API is Maven/Spring Boot with PostgreSQL and optional Redis.
+- [Spring JDBC timestamps](spring-jdbc-timestamps.md) — bind Java Instant values as UTC OffsetDateTime for PostgreSQL timestamptz parameters.

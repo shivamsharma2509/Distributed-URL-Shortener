@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: shortstack
+          POSTGRES_USER: shortstack
+          POSTGRES_PASSWORD: shortstack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shortstack -d shortstack"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql://shortstack:shortstack@localhost:5432/shortstack
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @workspace/api-spec run codegen
+
+      - run: pnpm --filter @workspace/db run push
+
+      - run: mvn -f artifacts/api-server/pom.xml test
+
+      - run: pnpm run typecheck
+
+      - run: PORT=5173 BASE_PATH=/ pnpm run build
+
+      - run: docker build -f artifacts/api-server/Dockerfile .
+
+      - run: docker build -f artifacts/url-shortener/Dockerfile .

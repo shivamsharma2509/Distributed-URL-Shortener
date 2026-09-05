@@ -1,0 +1,390 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API contract for the Distributed URL Shortener
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: urls
+    description: URL mapping management
+  - name: dashboard
+    description: Dashboard aggregates
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /v1/dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      description: Returns aggregate URL counts and the most recently created mappings.
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/urls:
+    get:
+      operationId: listUrls
+      tags: [urls]
+      summary: List shortened URLs
+      description: Returns URL mappings ordered by creation time, newest first.
+      parameters:
+        - $ref: "#/components/parameters/Status"
+        - name: search
+          in: query
+          description: Search by short code or original URL.
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+        - name: page
+          in: query
+          description: Zero-based page number.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: pageSize
+          in: query
+          description: Number of records per page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated URL mappings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UrlPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    post:
+      operationId: createUrl
+      tags: [urls]
+      summary: Create a shortened URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UrlInput"
+      responses:
+        "201":
+          description: URL mapping created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Url"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Custom alias already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Creation rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/urls/{shortCode}:
+    parameters:
+      - $ref: "#/components/parameters/ShortCode"
+    get:
+      operationId: getUrl
+      tags: [urls]
+      summary: Get URL metadata
+      responses:
+        "200":
+          description: URL metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Url"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: URL is expired or disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      operationId: updateUrl
+      tags: [urls]
+      summary: Update URL status or expiration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UrlUpdate"
+      responses:
+        "200":
+          description: Updated URL metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Url"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      operationId: deleteUrl
+      tags: [urls]
+      summary: Disable a shortened URL
+      description: Soft-disables a mapping and invalidates its cache entry.
+      responses:
+        "204":
+          description: URL disabled
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+  /v1/urls/{shortCode}/stats:
+    parameters:
+      - $ref: "#/components/parameters/ShortCode"
+    get:
+      operationId: getUrlStats
+      tags: [urls]
+      summary: Get URL click statistics
+      responses:
+        "200":
+          description: URL statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UrlStats"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+components:
+  parameters:
+    ShortCode:
+      name: shortCode
+      in: path
+      required: true
+      description: Public URL-safe short code.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 32
+        pattern: "^[A-Za-z0-9_-]+$"
+    Status:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [all, active, disabled, expired]
+        default: all
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: URL mapping not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Url:
+      type: object
+      properties:
+        shortCode:
+          type: string
+        shortUrl:
+          type: string
+          format: uri
+        originalUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        active:
+          type: boolean
+        clickCount:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - shortCode
+        - shortUrl
+        - originalUrl
+        - createdAt
+        - expiresAt
+        - active
+        - clickCount
+        - updatedAt
+    UrlInput:
+      type: object
+      properties:
+        originalUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+        customAlias:
+          type: ["string", "null"]
+          minLength: 3
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+      required:
+        - originalUrl
+    UrlUpdate:
+      type: object
+      properties:
+        active:
+          type: ["boolean", "null"]
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+    UrlStats:
+      type: object
+      properties:
+        shortCode:
+          type: string
+        clickCount:
+          type: integer
+          format: int64
+        active:
+          type: boolean
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+      required:
+        - shortCode
+        - clickCount
+        - active
+        - expiresAt
+        - lastUpdatedAt
+    UrlPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Url"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalItems:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+      required:
+        - items
+        - page
+        - pageSize
+        - totalItems
+        - totalPages
+    DashboardSummary:
+      type: object
+      properties:
+        totalUrls:
+          type: integer
+          format: int64
+        activeUrls:
+          type: integer
+          format: int64
+        totalClicks:
+          type: integer
+          format: int64
+        recentUrls:
+          type: array
+          items:
+            $ref: "#/components/schemas/Url"
+      required:
+        - totalUrls
+        - activeUrls
+        - totalClicks
+        - recentUrls
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+        - path
+

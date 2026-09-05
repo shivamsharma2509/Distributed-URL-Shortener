@@ -1,0 +1,14 @@
+{
+  "name": "@workspace/api-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mvn spring-boot:run -f pom.xml",
+    "build": "mvn -q -DskipTests package -f pom.xml",
+    "start": "java -jar target/shortstack-api-0.0.1-SNAPSHOT.jar",
+    "typecheck": "mvn -q -DskipTests compile -f pom.xml"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
