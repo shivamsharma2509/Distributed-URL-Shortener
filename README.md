@@ -1,6 +1,6 @@
 # Shortstack — Distributed URL Shortener
 
-Shortstack is a portfolio-grade URL shortening platform for creating, managing, and observing reliable redirects. It combines a typed REST API, PostgreSQL as the source of truth, Redis for cache-aside reads and rate limiting, and a responsive React control room.
+Shortstack is a portfolio-grade URL shortening platform for creating, managing, and observing reliable redirects. It combines a Spring Boot REST API, PostgreSQL as the source of truth, Redis for cache-aside reads and rate limiting, and a responsive React control room.
 
 ## What it demonstrates
 
@@ -19,7 +19,7 @@ Shortstack is a portfolio-grade URL shortening platform for creating, managing, 
 ```mermaid
 flowchart LR
     Browser --> Web["React + Vite"]
-    Web --> API["Express API"]
+    Web --> API["Spring Boot API"]
     API --> Redis["Redis cache + rate limiter"]
     API --> Postgres["PostgreSQL source of truth"]
 ```
@@ -29,33 +29,53 @@ See [docs/architecture.md](docs/architecture.md) for request flows, schema decis
 ## Stack
 
 - TypeScript, React, Vite, Tailwind CSS
-- Node.js, Express 5
-- PostgreSQL, Drizzle ORM
-- Redis via ioredis
+- Java 19, Spring Boot, Maven
+- Spring JDBC and Jakarta Bean Validation
+- PostgreSQL
+- Redis via Spring Data Redis
 - OpenAPI, Orval, Zod, TanStack Query
 - Docker Compose and GitHub Actions
 
-The repository was bootstrapped in a pnpm workspace so the frontend, shared API contract, database library, and API server can be developed together.
+The repository uses a pnpm workspace for the React frontend and shared API contract, while the API is a conventional Maven Spring Boot service under `artifacts/api-server`.
 
 ## Run locally
 
-### Fastest option
+### Prerequisites
+
+- Java 19 or newer
+- Maven 3.8+
+- Node.js 20+ and pnpm
+- PostgreSQL 16
+- Redis 7 (optional; the API falls back to PostgreSQL when Redis is unavailable)
+
+### Start dependencies
+
+```bash
+docker compose up -d postgres redis
+```
+
+### Run the Spring Boot API
+
+```bash
+export DATABASE_URL=postgresql://shortstack:shortstack@localhost:5432/shortstack
+export REDIS_URL=redis://localhost:6379
+export SHORT_URL_BASE_URL=http://localhost:5000
+export CORS_ORIGIN=http://localhost:5173
+export PORT=5000
+mvn -f artifacts/api-server/pom.xml spring-boot:run
+```
+
+The API creates the `url_mappings` table and indexes automatically on startup.
+
+### Run the React dashboard
 
 ```bash
 pnpm install
-pnpm --filter @workspace/db run push
 pnpm --filter @workspace/api-spec run codegen
+PORT=5173 BASE_PATH=/ API_URL=http://localhost:5000 pnpm --filter @workspace/url-shortener run dev
 ```
 
-Start the API and frontend through the configured workflows, or run them from separate terminals:
-
-```bash
-pnpm --filter @workspace/api-server run dev
-pnpm --filter @workspace/url-shortener run dev
-```
-
-The application expects `DATABASE_URL`. Redis is optional during local development; when unavailable, the API continues with PostgreSQL and logs a degraded-cache warning.
-
+The API is available on port `5000` and the dashboard on port `5173`. Vite proxies `/api` requests to Spring Boot during local development.
 ### Docker Compose
 
 ```bash
@@ -63,7 +83,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The web application is available on port `5173`, the API on port `5000`, PostgreSQL on `5432`, and Redis on `6379`.
+The web application is available on port `5173`, the Spring Boot API on port `5000`, PostgreSQL on `5432`, and Redis on `6379`.
 
 ## API
 
@@ -96,10 +116,9 @@ curl -X POST http://localhost:5000/api/v1/urls \
 ## Testing and quality checks
 
 ```bash
-pnpm run typecheck:libs
-pnpm --filter @workspace/api-server run typecheck
+mvn -f artifacts/api-server/pom.xml test
 pnpm --filter @workspace/url-shortener run typecheck
-pnpm run build
+pnpm --filter @workspace/url-shortener run build
 ```
 
 ## Configuration
@@ -108,7 +127,8 @@ Copy `.env.example` and set values for the environment. Never commit `.env`.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string | required |
+| `DATABASE_URL` | PostgreSQL connection string without the `jdbc:` prefix | required |
+| `JDBC_DATABASE_URL` | Optional JDBC-prefixed PostgreSQL URL override | derived from `DATABASE_URL` |
 | `REDIS_URL` | Redis connection string | optional |
 | `REDIS_CACHE_TTL_SECONDS` | Mapping cache TTL | `3600` |
 | `CREATE_RATE_LIMIT` | URL creations per minute per client | `30` |

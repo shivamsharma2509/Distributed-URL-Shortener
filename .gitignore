@@ -2,6 +2,7 @@
 
 # compiled output
 dist
+target
 tmp
 out-tsc
 *.tsbuildinfo
@@ -44,11 +45,12 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Replit
-.cache/
-.local/
-
 # Environment files
 .env
 .env.*
 !.env.example
+
+# Maven
+pom.xml.versionsBackup
+release.properties
+.config/

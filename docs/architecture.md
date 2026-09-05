@@ -82,8 +82,8 @@ URL creation uses a fixed one-minute window stored in Redis. The key includes th
 
 ## Horizontal scaling
 
-API instances are stateless. No local files, sessions, locks, or mutable singleton data are required for correctness. Hikari-style connection pooling is represented by the Node PostgreSQL pool in this runtime; pool sizing should be tuned against the database’s connection budget rather than scaled independently per instance.
+API instances are stateless. No local files, sessions, locks, or mutable singleton data are required for correctness. Hikari manages each instance's PostgreSQL connection pool; pool sizing should be tuned against the database’s connection budget rather than scaled independently per instance.
 
-## Current runtime boundary
+## Runtime
 
-The shared Replit workspace provides a pnpm/TypeScript application runtime, so the implemented deployable uses Express, Drizzle, and React while preserving the requested distributed-system design decisions. The OpenAPI contract, database source-of-truth model, Redis cache strategy, concurrency rules, Docker setup, and CI surface remain portable to a Java 21/Spring Boot implementation if the repository later moves to a Maven runtime.
+The frontend remains a pnpm/Vite application, while the API is a standalone Maven Spring Boot service. Spring MVC owns HTTP routing and validation, Spring JDBC owns PostgreSQL access, Hikari manages the connection pool, and Spring Data Redis provides the optional cache and rate-limit client. This split keeps the API stateless and allows it to scale independently from the dashboard.

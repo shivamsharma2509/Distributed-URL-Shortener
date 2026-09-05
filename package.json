@@ -9,10 +9,10 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
-  "dependencies": {
-    "@replit/connectors-sdk": "^0.4.1"
-  },
   "devDependencies": {
+    "@rollup/rollup-darwin-arm64": "4.62.3",
+    "@tailwindcss/oxide-darwin-arm64": "4.3.3",
+    "lightningcss-darwin-arm64": "1.32.0",
     "prettier": "^3.9.6",
     "typescript": "~5.9.3"
   }
